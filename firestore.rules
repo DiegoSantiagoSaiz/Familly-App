@@ -1,0 +1,257 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // 0. Global Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- Helpers ---
+    
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+    
+    function getFamily(familyId) {
+      return get(/databases/$(database)/documents/families/$(familyId));
+    }
+    
+    function isFamilyMember(familyId) {
+      return isSignedIn() && familyId != null && getFamily(familyId).data.members.hasAny([request.auth.uid]);
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+    
+    function existing() {
+      return resource.data;
+    }
+
+    // --- Validations ---
+
+    function isValidUser(data) {
+      return data.uid == request.auth.uid 
+        && data.displayName is string && data.displayName.size() <= 100
+        && (data.familyId == null || isValidId(data.familyId));
+    }
+
+    function isValidFamily(data) {
+      return data.name is string && data.name.size() <= 100
+        && data.members is list && data.members.size() <= 50;
+    }
+
+    function isValidTask(data) {
+      return data.title is string && data.title.size() <= 200
+        && data.familyId != null && data.familyId is string
+        && (data.creatorId == request.auth.uid || (resource != null && data.creatorId == resource.data.creatorId))
+        && (data.dueDate == null || (data.dueDate is string && data.dueDate.size() <= 100 && data.dueDate.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?(Z|[+-][0-9]{2}:[0-9]{2})$')))
+        && (data.reminderAt == null || (data.reminderAt is string && data.reminderAt.size() <= 100 && data.reminderAt.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?(Z|[+-][0-9]{2}:[0-9]{2})$')))
+        && (data.reminderTriggered == null || data.reminderTriggered is bool)
+        && (data.subCategory == null || (data.subCategory is string && data.subCategory.size() <= 100))
+        && (data.tags == null || (data.tags is list && data.tags.size() <= 10));
+    }
+
+    function isValidMessage(data) {
+      return data.content is string && data.content.size() <= 1000
+        && data.familyId != null && data.familyId is string
+        && data.authorId == request.auth.uid
+        && (data.authorName == null || (data.authorName is string && data.authorName.size() <= 100))
+        && (data.category == null || (data.category is string && data.category.size() <= 50))
+        && (data.tags == null || (data.tags is list && data.tags.size() <= 5));
+    }
+
+    function isValidMood(data) {
+      return data.userId == request.auth.uid
+        && data.familyId != null && data.familyId is string
+        && data.value is number && data.value >= 1 && data.value <= 5;
+    }
+
+    function isValidVacation(data) {
+      return data.destination is string && data.destination.size() <= 200
+        && data.familyId != null && data.familyId is string
+        && data.startDate is string && data.endDate is string
+        && (data.budget == null || data.budget is number)
+        && (data.attachments == null || (data.attachments is list && data.attachments.size() <= 10));
+    }
+
+    function isValidExpense(data) {
+      return data.description is string && data.description.size() <= 200
+        && data.amount is number
+        && data.familyId != null && data.familyId is string
+        && data.authorId == request.auth.uid
+        && (data.vacationId == null || isValidId(data.vacationId));
+    }
+
+    function isValidPhoto(data) {
+      return data.url is string && data.url.size() <= 2000
+        && data.familyId != null && data.familyId is string
+        && data.authorId == request.auth.uid
+        && (data.caption == null || (data.caption is string && data.caption.size() <= 500));
+    }
+
+    function isValidEvent(data) {
+      return data.title is string && data.title.size() <= 200
+        && data.date is string
+        && data.familyId != null && data.familyId is string
+        && data.authorId == request.auth.uid
+        && data.type in ['holiday', 'note', 'birthday', 'anniversary']
+        && (data.description == null || (data.description is string && data.description.size() <= 1000));
+    }
+
+    function isValidNotification(data) {
+      return data.title is string && data.title.size() <= 100
+        && data.body is string && data.body.size() <= 500
+        && data.type in ['task', 'message', 'expense', 'photo', 'system']
+        && data.read == false;
+    }
+
+    function isValidSubtask(data) {
+      return data.title is string && data.title.size() <= 200
+        && data.completed is bool
+        && (data.assigneeId == null || isValidId(data.assigneeId));
+    }
+
+    function isValidComment(data) {
+      return data.content is string && data.content.size() <= 1000
+        && data.authorId == request.auth.uid
+        && data.authorName is string && data.authorName.size() <= 100;
+    }
+
+    function isValidTaskTemplate(data) {
+      return data.title is string && data.title.size() <= 200
+        && data.familyId != null && data.familyId is string
+        && data.creatorId == request.auth.uid
+        && data.category is string && data.category.size() <= 50
+        && data.priority is string && data.priority.size() <= 20
+        && (data.assignedTo == null || (data.assignedTo is string && data.assignedTo.size() <= 100))
+        && (data.createdAt == null || data.createdAt is timestamp || data.createdAt is string)
+        && (data.subCategory == null || (data.subCategory is string && data.subCategory.size() <= 100));
+    }
+
+    function isValidTrophy(data) {
+      return data.title is string && data.title.size() <= 200
+        && data.description is string && data.description.size() <= 500
+        && data.familyId != null && data.familyId is string
+        && data.userId is string && data.userId.size() <= 100
+        && data.category in ['tasks', 'expenses', 'messages', 'moods', 'photos', 'custom']
+        && (data.userDisplayName == null || (data.userDisplayName is string && data.userDisplayName.size() <= 100))
+        && (data.icon == null || (data.icon is string && data.icon.size() <= 100))
+        && (data.earnedCriteria == null || (data.earnedCriteria is string && data.earnedCriteria.size() <= 500));
+    }
+
+    // --- Match Rules ---
+
+    match /users/{userId} {
+      allow read: if isSignedIn() && (isOwner(userId) || (resource.data.familyId != null && isFamilyMember(resource.data.familyId)));
+      // Permitir creación/actualización de su propio perfil
+      allow create, update: if isOwner(userId) && isValidUser(incoming());
+    }
+
+    match /families/{familyId} {
+      // Cualquier usuario logueado puede intentar leer una familia (necesario para unirse o verificar ID)
+      // Pero mejor restringir a miembros para 'get'
+      allow get: if isSignedIn();
+      // 'list' restringido a miembros
+      allow list: if isSignedIn() && resource.data.members.hasAny([request.auth.uid]);
+      
+      // Permitir creación si el creador se incluye como miembro
+      allow create: if isSignedIn() && isValidFamily(incoming()) && incoming().members.hasAny([request.auth.uid]);
+      
+      // Solo miembros pueden actualizar (p.ej. para añadir a otros)
+      allow update: if isFamilyMember(familyId) && isValidFamily(incoming()) && incoming().members.hasAny([request.auth.uid]);
+    }
+
+    match /tasks/{taskId} {
+      allow read: if isFamilyMember(resource.data.familyId);
+      allow create: if isFamilyMember(incoming().familyId) && isValidTask(incoming());
+      allow update: if isFamilyMember(existing().familyId) && isValidTask(incoming()) && incoming().familyId == existing().familyId;
+      allow delete: if isFamilyMember(existing().familyId);
+
+      match /subtasks/{subtaskId} {
+        allow read: if isFamilyMember(get(/databases/$(database)/documents/tasks/$(taskId)).data.familyId);
+        allow create: if isFamilyMember(get(/databases/$(database)/documents/tasks/$(taskId)).data.familyId) && isValidSubtask(incoming());
+        allow update: if isFamilyMember(get(/databases/$(database)/documents/tasks/$(taskId)).data.familyId) && isValidSubtask(incoming());
+        allow delete: if isFamilyMember(get(/databases/$(database)/documents/tasks/$(taskId)).data.familyId);
+      }
+
+      match /comments/{commentId} {
+        allow read: if isFamilyMember(get(/databases/$(database)/documents/tasks/$(taskId)).data.familyId);
+        allow create: if isFamilyMember(get(/databases/$(database)/documents/tasks/$(taskId)).data.familyId) && isValidComment(incoming());
+        allow delete: if isFamilyMember(get(/databases/$(database)/documents/tasks/$(taskId)).data.familyId) && isOwner(existing().authorId);
+      }
+    }
+
+    match /messages/{messageId} {
+      allow read: if isFamilyMember(resource.data.familyId);
+      allow create: if isFamilyMember(incoming().familyId) && isValidMessage(incoming());
+      allow update: if isFamilyMember(existing().familyId) && isOwner(existing().authorId) && isValidMessage(incoming()) && incoming().familyId == existing().familyId;
+      allow delete: if isFamilyMember(existing().familyId) && (isOwner(existing().authorId));
+    }
+
+    match /moods/{moodId} {
+      allow read: if isFamilyMember(resource.data.familyId);
+      allow create: if isFamilyMember(incoming().familyId) && isValidMood(incoming());
+      allow update: if isOwner(existing().userId) && isValidMood(incoming()) && incoming().familyId == existing().familyId;
+      allow delete: if isOwner(existing().userId);
+    }
+
+    match /vacations/{vacationId} {
+      allow read: if isFamilyMember(resource.data.familyId);
+      allow create: if isFamilyMember(incoming().familyId) && isValidVacation(incoming());
+      allow update: if isFamilyMember(existing().familyId) && isValidVacation(incoming()) && incoming().familyId == existing().familyId;
+      allow delete: if isFamilyMember(existing().familyId);
+    }
+
+    match /expenses/{expenseId} {
+      allow read: if isFamilyMember(resource.data.familyId);
+      allow create: if isFamilyMember(incoming().familyId) && isValidExpense(incoming());
+      allow update: if isFamilyMember(existing().familyId) && isValidExpense(incoming()) && incoming().familyId == existing().familyId;
+      allow delete: if isFamilyMember(existing().familyId);
+    }
+
+    match /photos/{photoId} {
+      allow read: if isFamilyMember(resource.data.familyId);
+      allow create: if isFamilyMember(incoming().familyId) && isValidPhoto(incoming());
+      allow update: if isFamilyMember(existing().familyId) && isValidPhoto(incoming()) && incoming().familyId == existing().familyId;
+      allow delete: if isFamilyMember(existing().familyId);
+    }
+
+    match /events/{eventId} {
+      allow read: if isFamilyMember(resource.data.familyId);
+      allow create: if isFamilyMember(incoming().familyId) && isValidEvent(incoming());
+      allow update: if isFamilyMember(existing().familyId) && isValidEvent(incoming()) && incoming().familyId == existing().familyId;
+      allow delete: if isFamilyMember(existing().familyId);
+    }
+
+    match /users/{userId}/notifications/{notifId} {
+      allow read: if isOwner(userId);
+      allow create: if isSignedIn() && isFamilyMember(get(/databases/$(database)/documents/users/$(userId)).data.familyId) && isValidNotification(incoming());
+      allow update: if isOwner(userId) && incoming().diff(existing()).affectedKeys().hasOnly(['read']);
+      allow delete: if isOwner(userId);
+    }
+
+    match /task_templates/{templateId} {
+      allow read: if isFamilyMember(resource.data.familyId);
+      allow create: if isFamilyMember(incoming().familyId) && isValidTaskTemplate(incoming());
+      allow update: if isFamilyMember(existing().familyId) && isValidTaskTemplate(incoming()) && incoming().familyId == existing().familyId;
+      allow delete: if isFamilyMember(existing().familyId);
+    }
+
+    match /trophies/{trophyId} {
+      allow read: if isFamilyMember(resource.data.familyId);
+      allow create: if isFamilyMember(incoming().familyId) && isValidTrophy(incoming());
+      allow update: if isFamilyMember(existing().familyId) && isValidTrophy(incoming()) && incoming().familyId == existing().familyId;
+      allow delete: if isFamilyMember(existing().familyId);
+    }
+  }
+}

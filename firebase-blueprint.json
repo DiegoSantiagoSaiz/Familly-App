@@ -1,0 +1,268 @@
+{
+  "entities": {
+    "Family": {
+      "title": "Family",
+      "description": "A group representing a family unit.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "members": { "type": "array", "items": { "type": "string" } }
+      },
+      "required": ["name", "createdAt"]
+    },
+    "User": {
+      "title": "User",
+      "description": "A system user, member of exactly one family.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "displayName": { "type": "string" },
+        "email": { "type": "string" },
+        "photoURL": { "type": "string" },
+        "familyId": { "type": "string" },
+        "theme": { "type": "string" },
+        "lastActive": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "displayName", "familyId"]
+    },
+    "Task": {
+      "title": "Task",
+      "description": "An actionable item shared within the family.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "category": { "type": "string", "enum": ["Shopping", "Home", "Kids", "Finance", "Other"] },
+        "subCategory": { "type": "string" },
+        "priority": { "type": "string", "enum": ["Low", "Medium", "High", "Critical"] },
+        "assignedTo": { "type": "string" },
+        "status": { "type": "string", "enum": ["Pending", "In Progress", "Completed"] },
+        "dueDate": { "type": "string", "format": "date-time" },
+        "reminderAt": { "type": "string", "format": "date-time" },
+        "reminderTriggered": { "type": "boolean" },
+        "attachments": { "type": "array", "items": { "type": "object" } },
+        "tags": { "type": "array", "items": { "type": "string" } },
+        "creatorId": { "type": "string" },
+        "familyId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["title", "category", "status", "familyId", "creatorId", "createdAt"]
+    },
+    "Message": {
+      "title": "Message",
+      "description": "Digital post-it note for quick family communication.",
+      "type": "object",
+      "properties": {
+        "content": { "type": "string" },
+        "authorId": { "type": "string" },
+        "authorName": { "type": "string" },
+        "familyId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "color": { "type": "string" },
+        "tags": { "type": "array", "items": { "type": "string" } },
+        "category": { "type": "string" }
+      },
+      "required": ["content", "authorId", "familyId", "createdAt"]
+    },
+    "Mood": {
+      "title": "Mood",
+      "description": "Daily mood entry for family satisfaction tracking.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "familyId": { "type": "string" },
+        "value": { "type": "number" },
+        "date": { "type": "string", "format": "date" }
+      },
+      "required": ["userId", "familyId", "value", "date"]
+    },
+    "Vacation": {
+      "title": "Vacation",
+      "description": "A planned family trip.",
+      "type": "object",
+      "properties": {
+        "destination": { "type": "string" },
+        "startDate": { "type": "string", "format": "date" },
+        "endDate": { "type": "string", "format": "date" },
+        "budget": { "type": "number" },
+        "familyId": { "type": "string" },
+        "status": { "type": "string", "enum": ["Planning", "Confirmed", "Completed"] },
+        "attachments": { "type": "array", "items": { "type": "string" } },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["destination", "startDate", "endDate", "familyId"]
+    },
+    "Expense": {
+      "title": "Expense",
+      "description": "A family expense entry.",
+      "type": "object",
+      "properties": {
+        "description": { "type": "string" },
+        "amount": { "type": "number" },
+        "category": { "type": "string" },
+        "date": { "type": "string", "format": "date-time" },
+        "familyId": { "type": "string" },
+        "authorId": { "type": "string" },
+        "vacationId": { "type": "string" }
+      },
+      "required": ["description", "amount", "date", "familyId", "authorId"]
+    },
+    "Photo": {
+      "title": "Photo",
+      "description": "A family album photo entry.",
+      "type": "object",
+      "properties": {
+        "url": { "type": "string" },
+        "caption": { "type": "string" },
+        "date": { "type": "string", "format": "date-time" },
+        "familyId": { "type": "string" },
+        "authorId": { "type": "string" }
+      },
+      "required": ["url", "date", "familyId", "authorId"]
+    },
+    "Notification": {
+      "title": "Notification",
+      "description": "An alert for the user about various family events.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "body": { "type": "string" },
+        "type": { "type": "string", "enum": ["task", "message", "expense", "photo", "system"] },
+        "read": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "link": { "type": "string" }
+      },
+      "required": ["title", "body", "type", "read", "createdAt"]
+    },
+    "Subtask": {
+      "title": "Subtask",
+      "description": "A smaller task within a task.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "completed": { "type": "boolean" },
+        "assigneeId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["title", "completed", "createdAt"]
+    },
+    "Comment": {
+      "title": "Comment",
+      "description": "A comment on a task.",
+      "type": "object",
+      "properties": {
+        "content": { "type": "string" },
+        "authorId": { "type": "string" },
+        "authorName": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["content", "authorId", "authorName", "createdAt"]
+    },
+    "Event": {
+      "title": "Event",
+      "description": "A calendar event or note for a specific day.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "date": { "type": "string", "format": "date" },
+        "familyId": { "type": "string" },
+        "authorId": { "type": "string" },
+        "type": { "type": "string", "enum": ["holiday", "note", "birthday", "anniversary"] },
+        "description": { "type": "string" }
+      },
+      "required": ["title", "date", "familyId", "authorId", "type"]
+    },
+    "TaskTemplate": {
+      "title": "TaskTemplate",
+      "description": "A saved task blueprint for common family routines.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "category": { "type": "string", "enum": ["Shopping", "Home", "Kids", "Finance", "Other"] },
+        "subCategory": { "type": "string" },
+        "priority": { "type": "string", "enum": ["Low", "Medium", "High", "Critical"] },
+        "assignedTo": { "type": "string" },
+        "creatorId": { "type": "string" },
+        "familyId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["title", "category", "priority", "familyId", "creatorId", "createdAt"]
+    },
+    "Trophy": {
+      "title": "Trophy",
+      "description": "An achievement badge earned by a family member.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "category": { "type": "string", "enum": ["tasks", "expenses", "messages", "moods", "photos", "custom"] },
+        "userId": { "type": "string" },
+        "familyId": { "type": "string" },
+        "userDisplayName": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "icon": { "type": "string" },
+        "earnedCriteria": { "type": "string" }
+      },
+      "required": ["title", "description", "category", "userId", "familyId", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/families/{familyId}": {
+      "schema": "Family",
+      "description": "Family group data."
+    },
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profile and family link."
+    },
+    "/users/{userId}/notifications/{notifId}": {
+      "schema": "Notification",
+      "description": "User specific notifications."
+    },
+    "/tasks/{taskId}": {
+      "schema": "Task",
+      "description": "Family tasks collection."
+    },
+    "/tasks/{taskId}/subtasks/{subtaskId}": {
+      "schema": "Subtask",
+      "description": "Sub-tasks for a specific task."
+    },
+    "/tasks/{taskId}/comments/{commentId}": {
+      "schema": "Comment",
+      "description": "Comments left on a task."
+    },
+    "/messages/{messageId}": {
+      "schema": "Message",
+      "description": "Family message wall entries."
+    },
+    "/moods/{moodId}": {
+      "schema": "Mood",
+      "description": "Daily mood entries for the family members."
+    },
+    "/vacations/{vacationId}": {
+      "schema": "Vacation",
+      "description": "Family vacation planning entries."
+    },
+    "/expenses/{expenseId}": {
+      "schema": "Expense",
+      "description": "Family expense tracking entries."
+    },
+    "/photos/{photoId}": {
+      "schema": "Photo",
+      "description": "Family album photo entries."
+    },
+    "/events/{eventId}": {
+      "schema": "Event",
+      "description": "Family calendar events."
+    },
+    "/task_templates/{templateId}": {
+      "schema": "TaskTemplate",
+      "description": "Saved task templates for quickly creating recurring tasks."
+    },
+    "/trophies/{trophyId}": {
+      "schema": "Trophy",
+      "description": "Family achievements and completion milestones."
+    }
+  }
+}
