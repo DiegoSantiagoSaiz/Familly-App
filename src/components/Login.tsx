@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
 import { useFamily } from '../context/FamilyContext';
 import { loginWithGoogle } from '../lib/firebase';
-import { LogIn, Users, CheckCircle, Zap, Shield } from 'lucide-react';
+import { LogIn, Users, CheckCircle, Zap, Shield, KeyRound, PlusCircle } from 'lucide-react';
 import { motion } from 'motion/react';
 
 export default function Login() {
-  const { user, loading, joinOrCreateFamily } = useFamily();
+  const { user, loading, joinOrCreateFamily, joinFamily } = useFamily();
   const [familyName, setFamilyName] = useState('');
+  const [familyIdInput, setFamilyIdInput] = useState('');
+  const [onboardingMode, setOnboardingMode] = useState<'create' | 'join'>('create');
   const [step, setStep] = useState(user ? 2 : 1);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
 
@@ -38,23 +40,42 @@ export default function Login() {
 
   const handleFinish = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!familyName.trim() || isFinishing) return;
-    setIsFinishing(true);
     setError(null);
-    try {
-      await joinOrCreateFamily(familyName);
-    } catch (err: any) {
-      console.error(err);
-      // Try to extract a more useful message if it's a JSON string from handleFirestoreError
-      let msg = "Could not create family. Please check your connection.";
+
+    if (onboardingMode === 'create') {
+      if (!familyName.trim() || isFinishing) return;
+      setIsFinishing(true);
       try {
-        const parsed = JSON.parse(err.message);
-        if (parsed.error) msg = `Error: ${parsed.error}`;
-      } catch (e) {
-        if (err.message) msg = err.message;
+        await joinOrCreateFamily(familyName);
+      } catch (err: any) {
+        console.error(err);
+        let msg = "Could not create family. Please check your connection.";
+        try {
+          const parsed = JSON.parse(err.message);
+          if (parsed.error) msg = `Error: ${parsed.error}`;
+        } catch (e) {
+          if (err.message) msg = err.message;
+        }
+        setError(msg);
+        setIsFinishing(false);
       }
-      setError(msg);
-      setIsFinishing(false);
+    } else {
+      if (!familyIdInput.trim() || isFinishing) return;
+      setIsFinishing(true);
+      try {
+        await joinFamily(familyIdInput);
+      } catch (err: any) {
+        console.error(err);
+        let msg = "Could not join family. Please make sure the code is correct.";
+        try {
+          const parsed = JSON.parse(err.message);
+          if (parsed.error) msg = `Error: ${parsed.error}`;
+        } catch (e) {
+          if (err.message) msg = err.message;
+        }
+        setError(msg);
+        setIsFinishing(false);
+      }
     }
   };
 
@@ -100,29 +121,87 @@ export default function Login() {
             </button>
           </div>
         ) : (
-          <form onSubmit={handleFinish} className="space-y-6">
-            <div>
-              <label className="block text-sm font-bold text-gray-700 mb-2 px-1">Give your family a name</label>
-              <input 
-                autoFocus
-                value={familyName}
-                onChange={(e) => setFamilyName(e.target.value)}
-                placeholder="The Smith's Home..."
-                className="w-full px-5 py-4 bg-gray-50 rounded-2xl border-none outline-none focus:ring-2 focus:ring-blue-100 text-gray-700 font-medium"
-              />
+          <div className="space-y-6">
+            {/* Mode selection tabs */}
+            <div className="grid grid-cols-2 gap-2 p-1 bg-gray-100 rounded-2xl">
+              <button
+                type="button"
+                onClick={() => setOnboardingMode('create')}
+                className={`py-3 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2 ${
+                  onboardingMode === 'create'
+                    ? 'bg-white text-blue-600 shadow-sm font-extrabold'
+                    : 'text-gray-500 hover:text-gray-950 font-bold'
+                }`}
+              >
+                <PlusCircle size={14} />
+                <span>Crear Nueva</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setOnboardingMode('join')}
+                className={`py-3 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2 ${
+                  onboardingMode === 'join'
+                    ? 'bg-white text-blue-600 shadow-sm font-extrabold'
+                    : 'text-gray-500 hover:text-gray-950 font-bold'
+                }`}
+              >
+                <KeyRound size={14} />
+                <span>Unirme a una</span>
+              </button>
             </div>
-            <button 
-              type="submit"
-              disabled={isFinishing || !familyName.trim()}
-              className="w-full bg-blue-600 text-white py-4 rounded-2xl font-bold hover:bg-blue-700 transition-all shadow-lg shadow-blue-100 disabled:opacity-50"
-            >
-              {isFinishing ? (
-                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin mx-auto" />
+
+            <form onSubmit={handleFinish} className="space-y-6">
+              {onboardingMode === 'create' ? (
+                <div>
+                  <label className="block text-xs font-black uppercase tracking-wider text-gray-500 mb-2 px-1">
+                    Nombra tu nueva casa / familia
+                  </label>
+                  <input 
+                    autoFocus
+                    key="create-input"
+                    value={familyName}
+                    onChange={(e) => setFamilyName(e.target.value)}
+                    placeholder="Ej. Casa de los García, Mi Familia..."
+                    className="w-full px-5 py-4 bg-gray-50 rounded-2xl border-none outline-none focus:ring-2 focus:ring-blue-100 text-gray-700 font-bold text-sm"
+                  />
+                  <p className="text-[10px] text-gray-400 font-bold mt-2 leading-relaxed px-1">
+                    Esto creará un nuevo centro de control y te dará un código exclusivo que podrás compartir.
+                  </p>
+                </div>
               ) : (
-                'Get Started'
+                <div>
+                  <label className="block text-xs font-black uppercase tracking-wider text-gray-500 mb-2 px-1">
+                    Ingresa el Código de Familia
+                  </label>
+                  <input 
+                    autoFocus
+                    key="join-input"
+                    value={familyIdInput}
+                    onChange={(e) => setFamilyIdInput(e.target.value)}
+                    placeholder="Pega el código único aquí..."
+                    className="w-full px-5 py-4 bg-gray-50 rounded-2xl border-none outline-none focus:ring-2 focus:ring-blue-100 text-gray-700 font-mono font-bold text-sm"
+                  />
+                  <p className="text-[10px] text-emerald-600 font-bold mt-2 leading-relaxed px-1">
+                    ✓ Pide a tu pareja o familiar que te comparta el código único desde el menú 'Administrar Familia' de su panel.
+                  </p>
+                </div>
               )}
-            </button>
-          </form>
+
+              <button 
+                type="submit"
+                disabled={isFinishing || (onboardingMode === 'create' ? !familyName.trim() : !familyIdInput.trim())}
+                className="w-full bg-blue-600 text-white py-4 rounded-2xl font-black uppercase tracking-wider text-xs hover:bg-blue-700 transition-all shadow-lg shadow-blue-100 disabled:opacity-50"
+              >
+                {isFinishing ? (
+                  <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin mx-auto" />
+                ) : onboardingMode === 'create' ? (
+                  'Crear y Empezar'
+                ) : (
+                  'Unirse al Hub'
+                )}
+              </button>
+            </form>
+          </div>
         )}
       </div>
     </div>

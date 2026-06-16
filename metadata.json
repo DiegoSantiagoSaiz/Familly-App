@@ -2,5 +2,5 @@
   "name": "FamilyHub: Beyond Tasks",
   "description": "Una aplicación familiar dinámica para la gestión de tareas, archivos, calendario y sincronización en tiempo real con IA.",
   "requestFramePermissions": ["geolocation", "microphone"],
-  "majorCapabilities": []
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

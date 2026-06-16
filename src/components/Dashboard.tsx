@@ -99,6 +99,7 @@ import {
   ExternalLink,
 } from "lucide-react";
 import { FamilyTrophies } from "./FamilyTrophies";
+import { InstallAppButton } from "./InstallAppButton";
 import {
   categorizeTask,
   getGroceriesSuggestions,
@@ -5080,6 +5081,20 @@ export default function Dashboard() {
     | "rose"
     | "sunny"
   >(() => {
+    // Usar directamente el tema de Firestore si ya fue cargado por useFamily()
+    const dbTheme = userData?.theme;
+    if (dbTheme && [
+      "aura",
+      "paper",
+      "nordic",
+      "cosmos",
+      "earth",
+      "fresh",
+      "rose",
+      "sunny",
+    ].includes(dbTheme)) {
+      return dbTheme as any;
+    }
     const saved = localStorage.getItem("theme") as any;
     return [
       "aura",
@@ -5095,18 +5110,28 @@ export default function Dashboard() {
       : "fresh";
   });
 
-  useEffect(() => {
-    localStorage.setItem("theme", theme);
-    if (userData?.uid && userData.theme !== theme) {
+  const lastLocalWriteRef = useRef<number>(0);
+
+  const handleThemeChange = (newTheme: any) => {
+    setTheme(newTheme);
+    localStorage.setItem("theme", newTheme);
+    lastLocalWriteRef.current = Date.now();
+    if (userData?.uid) {
       updateDoc(doc(db, "users", userData.uid), {
-        theme: theme,
+        theme: newTheme,
       }).catch((err) => {
         console.error("Error saving theme preference to Firestore:", err);
       });
     }
-  }, [theme, userData?.uid, userData?.theme]);
+  };
 
   useEffect(() => {
+    // Si cambiamos el tema localmente hace menos de 5 segundos, protegemos el estado local de rebotes
+    // de Firestore (evita que la latencia, cache o snapshots pendientes reviertan el tema)
+    if (Date.now() - lastLocalWriteRef.current < 5000) {
+      return;
+    }
+
     if (
       userData?.theme &&
       [
@@ -5120,9 +5145,12 @@ export default function Dashboard() {
         "sunny",
       ].includes(userData.theme)
     ) {
-      setTheme(userData.theme as any);
+      if (userData.theme !== theme) {
+        setTheme(userData.theme as any);
+        localStorage.setItem("theme", userData.theme);
+      }
     }
-  }, [userData?.theme]);
+  }, [userData?.theme, theme]);
   const [activeHub, setActiveHub] = useState<string>(() => {
     const saved = localStorage.getItem("activeHub");
     return saved || "Dashboard";
@@ -5187,34 +5215,10 @@ export default function Dashboard() {
   }, []);
 
   const [showAvatarModal, setShowAvatarModal] = useState<string | null>(null);
-  const [deferredInstallPrompt, setDeferredInstallPrompt] = useState<any>(null);
   const [isInstallModalOpen, setIsInstallModalOpen] = useState(false);
 
-  useEffect(() => {
-    const handleBeforeInstallPrompt = (e: any) => {
-      e.preventDefault();
-      setDeferredInstallPrompt(e);
-    };
-
-    window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
-    return () => {
-      window.removeEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
-    };
-  }, []);
-
   const handleInstallApp = async () => {
-    if (deferredInstallPrompt) {
-      deferredInstallPrompt.prompt();
-      try {
-        const { outcome } = await deferredInstallPrompt.userChoice;
-        console.log(`User choice for PWA install: ${outcome}`);
-        setDeferredInstallPrompt(null);
-      } catch (err) {
-        console.warn("PWA prompt error:", err);
-      }
-    } else {
-      setIsInstallModalOpen(true);
-    }
+    setIsInstallModalOpen(true);
   };
 
   // States for interactive DiceBear generator and Gemini AI generator
@@ -5880,16 +5884,13 @@ export default function Dashboard() {
             </div>
           </div>
 
-          <button
-            onClick={handleInstallApp}
-            className={`flex items-center gap-3 rounded-xl opacity-60 hover:opacity-100 hover:bg-amber-500/10 hover:text-amber-500 transition-all ${isSidebarCollapsed ? "p-3 justify-center" : "px-4 py-3 w-full text-[10px] font-black uppercase tracking-widest"}`}
-            title={language === "es" ? "Instalar App" : "Install App"}
-          >
-            <Smartphone size={16} className={deferredInstallPrompt ? "animate-bounce text-amber-500" : ""} />
-            {!isSidebarCollapsed && (
-              <span>{language === "es" ? "Instalar App" : "Install App"}</span>
-            )}
-          </button>
+          <div className="w-full">
+            <InstallAppButton
+              isDark={isDark}
+              language={language === "es" ? "es" : "en"}
+              variant={isSidebarCollapsed ? "icon" : "sidebar"}
+            />
+          </div>
 
           <button
             onClick={logout}
@@ -6079,16 +6080,14 @@ export default function Dashboard() {
                     </button>
                   ))}
                 </div>
-                <button
-                  onClick={() => {
-                    setIsMobileMenuOpen(false);
-                    handleInstallApp();
-                  }}
-                  className="w-full flex items-center justify-center gap-4 px-6 py-4 rounded-2xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-500 font-black text-xs uppercase tracking-widest transition-all"
-                >
-                  <Smartphone size={20} className={deferredInstallPrompt ? "animate-bounce" : ""} />
-                  {language === "es" ? "Instalar App" : "Install App"}
-                </button>
+                <div className="w-full">
+                  <InstallAppButton
+                    isDark={isDark}
+                    language={language === "es" ? "es" : "en"}
+                    variant="sidebar"
+                    onInstallStarted={() => setIsMobileMenuOpen(false)}
+                  />
+                </div>
                 <button
                   onClick={logout}
                   className="w-full flex items-center gap-4 px-6 py-4 rounded-2xl bg-rose-500/10 text-rose-500 font-black text-xs uppercase tracking-widest"
@@ -6347,7 +6346,7 @@ export default function Dashboard() {
 
             {/* Global Light/Dark Theme Toggle Button */}
             <button
-              onClick={() => setTheme(isDark ? "fresh" : "cosmos")}
+              onClick={() => handleThemeChange(isDark ? "fresh" : "cosmos")}
               className={`p-2.5 rounded-xl transition-all relative ${
                 isDark
                   ? "bg-white/10 text-yellow-400 hover:bg-white/15"
@@ -6363,48 +6362,42 @@ export default function Dashboard() {
             </button>
 
             {/* Theme Selector */}
-            <div
-              className={`flex items-center gap-1 p-1 rounded-xl ${isDark ? "bg-white/5" : "bg-black/5"}`}
-            >
-              {(
-                [
-                  "fresh",
-                  "nordic",
-                  "paper",
-                  "rose",
-                  "sunny",
-                  "aura",
-                  "cosmos",
-                  "earth",
-                ] as const
-              ).map((tKey) => (
-                <button
-                  key={tKey}
-                  onClick={() => setTheme(tKey)}
-                  className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all ${theme === tKey ? "bg-white shadow-sm scale-110" : "opacity-40 hover:opacity-100"}`}
-                  title={(t as any)[tKey] || tKey}
-                >
-                  <div
-                    className={`w-3 h-3 rounded-sm ${
-                      tKey === "aura"
-                        ? "bg-[#18181B]"
-                        : tKey === "paper"
-                          ? "bg-[#FAF9F6] border"
-                          : tKey === "fresh"
-                            ? "bg-[#10B981]"
-                            : tKey === "rose"
-                              ? "bg-[#E11D48]"
-                              : tKey === "sunny"
-                                ? "bg-[#D97706]"
-                                : tKey === "nordic"
-                                  ? "bg-[#3B82F6]"
-                                  : tKey === "cosmos"
-                                    ? "bg-[#4f46e5]"
-                                    : "bg-[#8B735B]"
-                    }`}
-                  />
-                </button>
-              ))}
+            <div className="relative flex items-center">
+              <select
+                value={theme}
+                onChange={(e) => handleThemeChange(e.target.value as any)}
+                className={`text-[11px] font-black uppercase tracking-wider py-2 pl-3 pr-8 rounded-xl border appearance-none outline-none cursor-pointer transition-all ${
+                  isDark
+                    ? "bg-white/10 text-white border-white/15 hover:bg-white/15"
+                    : "bg-black/5 text-zinc-800 border-black/5 hover:bg-black/10"
+                }`}
+                style={{
+                  backgroundImage: `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='${isDark ? "white" : "black"}' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='m6 9 6 6 6-6'/></svg>")`,
+                  backgroundRepeat: 'no-repeat',
+                  backgroundPosition: 'right 8px center',
+                  backgroundSize: '12px'
+                }}
+                title={language === "es" ? "Cambiar paleta de colores" : "Change color palette"}
+              >
+                {[
+                  { key: "fresh", name: language === "es" ? "🥑 Suave" : "🥑 Fresh" },
+                  { key: "nordic", name: language === "es" ? "❄️ Ártico" : "❄️ Nordic" },
+                  { key: "paper", name: language === "es" ? "📝 Papel" : "📝 Paper" },
+                  { key: "rose", name: language === "es" ? "🌺 Rosado" : "🌺 Rose" },
+                  { key: "sunny", name: language === "es" ? "☀️ Soleado" : "☀️ Sunny" },
+                  { key: "aura", name: language === "es" ? "⚡ Aura" : "⚡ Aura" },
+                  { key: "cosmos", name: language === "es" ? "🌌 Cosmos" : "🌌 Cosmos" },
+                  { key: "earth", name: language === "es" ? "🪵 Tierra" : "🪵 Earth" },
+                ].map((item) => (
+                  <option
+                    key={item.key}
+                    value={item.key}
+                    className={isDark ? "bg-[#18181B] text-white" : "bg-white text-zinc-800"}
+                  >
+                    {item.name}
+                  </option>
+                ))}
+              </select>
             </div>
 
             <div
@@ -6610,43 +6603,45 @@ export default function Dashboard() {
                             </motion.div>
                           )}
 
-                          <div className="flex flex-col md:flex-row md:items-center gap-4 mt-3 px-2 bg-black/5 dark:bg-white/5 p-4 rounded-2xl border border-transparent dark:border-white/5">
-                            <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 xl:grid-cols-4 gap-4 mt-4 bg-black/5 dark:bg-white/5 p-4 rounded-3xl border border-transparent dark:border-white/5">
+                            {/* Option 1: Reminder */}
+                            <div className="flex flex-col gap-1.5 min-w-0">
                               <span
-                                className={`text-xs font-bold flex items-center gap-1.5 ${isDark ? "text-zinc-400" : "text-zinc-650"}`}
+                                className={`text-[11px] uppercase tracking-wider font-extrabold flex items-center gap-1.5 ${isDark ? "text-zinc-400" : "text-zinc-500"}`}
                               >
                                 <Bell
-                                  size={14}
-                                  className="text-indigo-500 animate-bounce"
+                                  size={13}
+                                  className="text-indigo-500 animate-pulse"
                                 />
                                 {language === "es"
-                                  ? "Programar Recordatorio:"
-                                  : "Set Reminder:"}
+                                  ? "Recordatorio"
+                                  : "Reminder"}
                               </span>
-                              <input
-                                type="datetime-local"
-                                value={newTaskReminder}
-                                onChange={(e) =>
-                                  setNewTaskReminder(e.target.value)
-                                }
-                                className={`text-xs px-4 py-2 rounded-xl outline-none font-bold border w-full sm:w-auto min-w-0 max-w-full shrink ${isDark ? "bg-[#18181B] border-white/10 text-white" : "bg-white border-black/5 text-zinc-800"}`}
-                              />
-                              {newTaskReminder && (
-                                <button
-                                  type="button"
-                                  onClick={() => setNewTaskReminder("")}
-                                  className={`text-[10px] px-3 py-2 rounded-xl font-black transition-colors uppercase tracking-[0.05em] border ${isDark ? "bg-white/5 border-white/10 text-white hover:bg-white/10" : "bg-black/5 border-black/5 text-zinc-600 hover:bg-black/10"}`}
-                                >
-                                  {language === "es" ? "Limpiar" : "Clear"}
-                                </button>
-                              )}
+                              <div className="flex items-center gap-2">
+                                <input
+                                  type="datetime-local"
+                                  value={newTaskReminder}
+                                  onChange={(e) =>
+                                    setNewTaskReminder(e.target.value)
+                                  }
+                                  className={`text-xs px-3 py-2 w-full rounded-xl outline-none font-bold border min-w-0 ${isDark ? "bg-[#18181B] border-white/10 text-white" : "bg-white border-black/5 text-zinc-800"}`}
+                                />
+                                {newTaskReminder && (
+                                  <button
+                                    type="button"
+                                    onClick={() => setNewTaskReminder("")}
+                                    className={`text-[10px] px-2.5 py-2 rounded-xl font-black transition-colors uppercase tracking-[0.05em] border shrink-0 ${isDark ? "bg-white/5 border-white/10 text-white hover:bg-white/10" : "bg-black/5 border-black/5 text-zinc-650 hover:bg-black/10"}`}
+                                  >
+                                    ✕
+                                  </button>
+                                )}
+                              </div>
                             </div>
 
-                            <div className="h-4 w-[1px] bg-zinc-300 dark:bg-zinc-800 hidden md:block"></div>
-
-                            <div className="flex flex-wrap items-center gap-3">
+                            {/* Option 2: Recurring Task */}
+                            <div className="flex flex-col gap-1.5 min-w-0">
                               <label
-                                className={`flex items-center gap-2 text-xs font-bold cursor-pointer ${isDark ? "text-zinc-400" : "text-zinc-650"}`}
+                                className={`flex items-center gap-1.5 text-[11px] uppercase tracking-wider font-extrabold cursor-pointer ${isDark ? "text-zinc-400" : "text-zinc-500"}`}
                               >
                                 <input
                                   type="checkbox"
@@ -6654,107 +6649,81 @@ export default function Dashboard() {
                                   onChange={(e) =>
                                     setNewTaskIsRecurring(e.target.checked)
                                   }
-                                  className="w-4 h-4 rounded border-zinc-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                                  className="w-3.5 h-3.5 rounded border-zinc-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
                                 />
-                                <span className="flex items-center gap-1.5 font-bold">
+                                <span className="flex items-center gap-1">
                                   <RefreshCw
-                                    size={14}
+                                    size={12}
                                     className="text-indigo-500"
                                   />
                                   {language === "es"
-                                    ? "Tarea Recurrente"
-                                    : "Recurring Task"}
+                                    ? "Recurrente"
+                                    : "Recurring"}
                                 </span>
                               </label>
-
-                              {newTaskIsRecurring && (
-                                <div className="flex flex-wrap items-center gap-2 animate-in fade-in slide-in-from-left-2 duration-200">
-                                  <select
-                                    value={newTaskRecurrenceFrequency}
-                                    onChange={(e) =>
-                                      setNewTaskRecurrenceFrequency(
-                                        e.target.value as any,
-                                      )
-                                    }
-                                    className={`text-xs px-3 py-2 rounded-xl outline-none font-bold border ${isDark ? "bg-[#18181B] border-white/10 text-white" : "bg-white border-black/5 text-zinc-800"}`}
-                                  >
-                                    <option
-                                      value="daily"
-                                      className={
-                                        isDark
-                                          ? "bg-[#18181B] text-white"
-                                          : "bg-white text-zinc-850"
+                              <div className="flex flex-wrap items-center gap-1.5 w-full min-h-[34px]">
+                                {newTaskIsRecurring ? (
+                                  <div className="flex items-center gap-1 w-full min-w-0 animate-in fade-in slide-in-from-left-2 duration-200">
+                                    <select
+                                      value={newTaskRecurrenceFrequency}
+                                      onChange={(e) =>
+                                        setNewTaskRecurrenceFrequency(
+                                          e.target.value as any,
+                                        )
                                       }
+                                      className={`text-xs px-2 py-2 rounded-xl outline-none font-bold border min-w-0 shrink bg-transparent ${isDark ? "border-white/10 text-white bg-[#18181B]" : "border-black/5 text-zinc-805 bg-white"}`}
                                     >
-                                      {language === "es" ? "Diario" : "Daily"}
-                                    </option>
-                                    <option
-                                      value="weekly"
-                                      className={
-                                        isDark
-                                          ? "bg-[#18181B] text-white"
-                                          : "bg-white text-zinc-850"
-                                      }
-                                    >
-                                      {language === "es" ? "Semanal" : "Weekly"}
-                                    </option>
-                                    <option
-                                      value="monthly"
-                                      className={
-                                        isDark
-                                          ? "bg-[#18181B] text-white"
-                                          : "bg-white text-zinc-850"
-                                      }
-                                    >
-                                      {language === "es"
-                                        ? "Mensual"
-                                        : "Monthly"}
-                                    </option>
-                                  </select>
-
-                                  <span
-                                    className={`text-[11px] font-bold ${isDark ? "text-zinc-500" : "text-zinc-400"}`}
-                                  >
-                                    {language === "es" ? "hasta" : "until"}
+                                      <option value="daily" className={isDark ? "bg-[#18181B] text-white" : "bg-white text-zinc-850"}>
+                                        {language === "es" ? "Diario" : "Daily"}
+                                      </option>
+                                      <option value="weekly" className={isDark ? "bg-[#18181B] text-white" : "bg-white text-zinc-850"}>
+                                        {language === "es" ? "Semanal" : "Weekly"}
+                                      </option>
+                                      <option value="monthly" className={isDark ? "bg-[#18181B] text-white" : "bg-white text-zinc-850"}>
+                                        {language === "es" ? "Mensual" : "Monthly"}
+                                      </option>
+                                    </select>
+                                    <span className="text-[10px] font-bold opacity-40 shrink-0">→</span>
+                                    <div className="min-w-0 flex-1">
+                                      <CustomDatePicker
+                                        value={newTaskRecurrenceEndDate}
+                                        onChange={setNewTaskRecurrenceEndDate}
+                                        showTime={false}
+                                        label=""
+                                        isDark={isDark}
+                                        language={language}
+                                      />
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <span className={`text-[10px] font-bold italic opacity-30 ${isDark ? "text-zinc-500" : "text-zinc-400"}`}>
+                                    {language === "es" ? "Una sola vez" : "One-time"}
                                   </span>
-
-                                  <CustomDatePicker
-                                    value={newTaskRecurrenceEndDate}
-                                    onChange={setNewTaskRecurrenceEndDate}
-                                    showTime={false}
-                                    label=""
-                                    isDark={isDark}
-                                    language={language}
-                                  />
-                                </div>
-                              )}
+                                )}
+                              </div>
                             </div>
 
-                            <div className="h-4 w-[1px] bg-zinc-300 dark:bg-zinc-800 hidden md:block"></div>
-
-                            <div className="flex flex-wrap items-center gap-3">
+                            {/* Option 3: Assign to */}
+                            <div className="flex flex-col gap-1.5 min-w-0">
                               <span
-                                className={`text-xs font-bold flex items-center gap-1.5 ${isDark ? "text-zinc-400" : "text-zinc-650"}`}
+                                className={`text-[11px] uppercase tracking-wider font-extrabold flex items-center gap-1.5 ${isDark ? "text-zinc-400" : "text-zinc-500"}`}
                               >
-                                👤
-                                {language === "es"
-                                  ? "Asignar a:"
-                                  : "Assign to:"}
+                                👤 {language === "es" ? "Asignar a" : "Assign to"}
                               </span>
                               <select
                                 value={newTaskAssignedTo}
                                 onChange={(e) =>
                                   setNewTaskAssignedTo(e.target.value)
                                 }
-                                className={`text-xs px-4 py-2 rounded-xl outline-none font-bold border ${isDark ? "bg-[#18181B] border-white/10 text-white" : "bg-white border-black/5 text-zinc-804"}`}
+                                className={`text-xs px-3 py-2 w-full rounded-xl outline-none font-bold border min-w-0 ${isDark ? "bg-[#18181B] border-white/10 text-white" : "bg-white border-black/5 text-zinc-804"}`}
                               >
-                                <option value="">
+                                <option value="" className={isDark ? "bg-[#18181B] text-white" : "bg-white text-zinc-850"}>
                                   {language === "es"
                                     ? "Ambos (Sin asignar)"
                                     : "Both (Unassigned)"}
                                 </option>
                                 {customMembers.map((m: any) => (
-                                  <option key={m.id} value={m.name}>
+                                  <option key={m.id} value={m.name} className={isDark ? "bg-[#18181B] text-white" : "bg-white text-zinc-850"}>
                                     {m.id === "papa"
                                       ? "👦"
                                       : m.id === "mama"
@@ -6766,21 +6735,19 @@ export default function Dashboard() {
                               </select>
                             </div>
 
-                            <div className="h-4 w-[1px] bg-zinc-300 dark:bg-zinc-800 hidden md:block"></div>
-
-                            <div className="flex flex-wrap items-center gap-3">
+                            {/* Option 4: Tags */}
+                            <div className="flex flex-col gap-1.5 min-w-0">
                               <span
-                                className={`text-xs font-bold flex items-center gap-1.5 ${isDark ? "text-zinc-400" : "text-zinc-650"}`}
+                                className={`text-[11px] uppercase tracking-wider font-extrabold flex items-center gap-1.5 ${isDark ? "text-zinc-400" : "text-zinc-500"}`}
                               >
-                                🏷️
-                                {language === "es" ? "Etiquetas:" : "Tags:"}
+                                🏷️ {language === "es" ? "Etiquetas" : "Tags"}
                               </span>
                               <input
                                 type="text"
                                 value={newTaskTags}
                                 onChange={(e) => setNewTaskTags(e.target.value)}
                                 placeholder="e.g. laundry, urgent"
-                                className={`text-xs px-4 py-2 rounded-xl outline-none font-bold border ${isDark ? "bg-[#18181B] border-white/10 text-white" : "bg-white border-black/5 text-zinc-805"}`}
+                                className={`text-xs px-3 py-2 w-full rounded-xl outline-none font-bold border min-w-0 ${isDark ? "bg-[#18181B] border-white/10 text-white" : "bg-white border-black/5 text-zinc-805"}`}
                               />
                             </div>
                           </div>
@@ -7030,7 +6997,7 @@ export default function Dashboard() {
 
                   {/* Bulletin Board / Whiteboard */}
                   <div className="lg:col-span-4">
-                    <div className="p-6 sm:p-10 rounded-[2rem] sm:rounded-[3rem] shadow-sm relative overflow-hidden bg-[#FFFAB7] border-none text-zinc-900 h-full flex flex-col">
+                    <div className="p-6 sm:p-10 rounded-[2rem] sm:rounded-[3rem] shadow-sm relative overflow-hidden bg-[#FFFAB7] border-none text-zinc-900 h-full flex flex-col min-h-[480px] sm:min-h-[520px]">
                       <div className="flex justify-between items-center mb-8 relative z-10">
                         <h2 className="text-lg font-black uppercase tracking-tighter italic flex items-center gap-3">
                           <Pin size={24} className="text-rose-500" />
@@ -7038,7 +7005,7 @@ export default function Dashboard() {
                         </h2>
                       </div>
 
-                      <div className="flex-1 space-y-6 overflow-y-auto pr-2 custom-scrollbar relative z-10">
+                      <div className="flex-1 min-h-0 space-y-6 overflow-y-auto pr-2 custom-scrollbar relative z-10">
                         {messages.map((msg) => (
                           <div
                             key={msg.id}
@@ -7079,19 +7046,20 @@ export default function Dashboard() {
 
                       <form
                         onSubmit={handleAddMessage}
-                        className="mt-8 flex flex-col sm:flex-row gap-3 relative z-10"
+                        className="mt-6 flex gap-2 relative z-10 w-full min-w-0"
                       >
                         <input
                           value={newMessage}
                           onChange={(e) => setNewMessage(e.target.value)}
                           placeholder={t.addNote}
-                          className="flex-1 bg-white/60 px-5 py-4 rounded-xl sm:rounded-2xl outline-none font-bold placeholder:text-zinc-500/30 border border-black/5 focus:bg-white transition-all text-sm"
+                          className="flex-grow min-w-0 bg-white/60 px-4 py-4 rounded-xl sm:rounded-2xl outline-none font-bold placeholder:text-zinc-500/35 border border-black/5 focus:bg-white transition-all text-sm shadow-inner"
                         />
-                        <button className="px-6 py-4 sm:p-4 bg-zinc-900 text-white rounded-xl sm:rounded-2xl shadow-lg hover:scale-105 active:scale-95 transition-all flex items-center justify-center gap-2">
-                          <Send size={18} />
-                          <span className="sm:hidden font-black text-xs uppercase tracking-widest">
-                            {t.inject || "Add"}
-                          </span>
+                        <button
+                          type="submit"
+                          className="shrink-0 p-4 bg-zinc-900 text-white rounded-xl sm:rounded-2xl shadow-lg hover:scale-105 active:scale-95 transition-all flex items-center justify-center"
+                          title={t.addNote || "Add note"}
+                        >
+                          <Send size={18} className="shrink-0" />
                         </button>
                       </form>
 
@@ -10683,100 +10651,13 @@ export default function Dashboard() {
               </button>
             </div>
 
-            {/* Icon & Title */}
-            <div className="text-center sm:text-left space-y-4">
-              <div className="inline-flex p-3.5 bg-amber-500/10 rounded-2xl text-amber-500">
-                <Smartphone size={32} />
-              </div>
-              <div>
-                <h3 className="text-2xl sm:text-3xl font-black uppercase tracking-tighter italic">
-                  {language === "es" ? "Instalar App ParrHQ" : "Install ParrHQ App"}
-                </h3>
-                <p className="text-xs font-bold opacity-60 mt-1.5">
-                  {language === "es"
-                    ? "Accede al centro de control familiar directamente con un icono en la pantalla de inicio de tu móvil u ordenador."
-                    : "Access the family control center directly with an icon on your mobile or desktop home screen."}
-                </p>
-              </div>
-            </div>
-
-            {/* Warning if in an iframe */}
-            {window.self !== window.top && (
-              <div className="mt-6 p-4 rounded-2xl bg-rose-500/10 border border-rose-500/10 text-rose-500 text-xs font-bold space-y-2">
-                <p>
-                  ⚠️ {language === "es"
-                    ? "Estás viendo la app dentro del editor de Google AI Studio. Las aplicaciones no se pueden instalar directamente desde un cuadro integrado (iframe)."
-                    : "You are viewing the app inside the Google AI Studio editor. Apps cannot be installed directly from inside an iframe."}
-                </p>
-                <p>
-                  {language === "es"
-                    ? "Para poder instalarla con icono propio, ábrela fuera del editor haciendo clic abajo en el botón de Abrir en Pestaña Nueva, y luego vuelve a pulsar el botón 'Instalar App':"
-                    : "To install it with its own icon, open it outside of the editor by clicking the 'Open in New Tab' button below, then click the 'Install App' button there:"}
-                </p>
-                <a
-                  href={window.location.href}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 text-rose-500 underline hover:text-rose-400 font-black text-[11px] uppercase tracking-widest mt-1"
-                >
-                  <span>{language === "es" ? "Abrir en Pestaña Nueva" : "Open in New Tab"}</span>
-                  <ExternalLink size={12} />
-                </a>
-              </div>
-            )}
-
-            {/* Step-by-Step Instructions */}
-            <div className="mt-6 space-y-4">
-              {/* iOS Safari */}
-              <div className="flex gap-4 p-4 rounded-2xl bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/5">
-                <div className="p-2 bg-indigo-500/10 rounded-xl text-indigo-500 shrink-0 h-10 w-10 flex items-center justify-center">
-                  <Smartphone size={18} />
-                </div>
-                <div>
-                  <h4 className="text-xs font-black uppercase tracking-wider text-indigo-500">
-                    Apple iOS (Safari)
-                  </h4>
-                  <p className="text-[11px] font-bold opacity-70 mt-1 leading-relaxed">
-                    {language === "es"
-                      ? "Pulsa el botón de Compartir (el icono de un cuadrado con flecha hacia arriba) en la barra inferior de Safari, luego selecciona 'Añadir a la pantalla de inicio'."
-                      : "Tap the Share button (square icon with an up arrow) in Safari's bottom toolbar, then select 'Add to Home Screen'."}
-                  </p>
-                </div>
-              </div>
-
-              {/* Android Chrome */}
-              <div className="flex gap-4 p-4 rounded-2xl bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/5">
-                <div className="p-2 bg-emerald-500/10 rounded-xl text-emerald-500 shrink-0 h-10 w-10 flex items-center justify-center">
-                  <Smartphone size={18} />
-                </div>
-                <div>
-                  <h4 className="text-xs font-black uppercase tracking-wider text-emerald-500">
-                    Android (Chrome)
-                  </h4>
-                  <p className="text-[11px] font-bold opacity-70 mt-1 leading-relaxed">
-                    {language === "es"
-                      ? "Pulsa el botón de menú de 3 puntos en la esquina superior derecha y selecciona 'Instalar aplicación' o 'Añadir a la pantalla de inicio'."
-                      : "Tap the 3-dot menu button in Chrome's top-right corner and select 'Install app' or 'Add to home screen'."}
-                  </p>
-                </div>
-              </div>
-
-              {/* Desktop Computer */}
-              <div className="flex gap-4 p-4 rounded-2xl bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/5">
-                <div className="p-2 bg-amber-500/10 rounded-xl text-amber-500 shrink-0 h-10 w-10 flex items-center justify-center">
-                  <Laptop size={18} />
-                </div>
-                <div>
-                  <h4 className="text-xs font-black uppercase tracking-wider text-amber-500">
-                    {language === "es" ? "Ordenador (Chrome, Edge)" : "Desktop Computer"}
-                  </h4>
-                  <p className="text-[11px] font-bold opacity-70 mt-1 leading-relaxed">
-                    {language === "es"
-                      ? "Busca un icono de monitor con una flecha hacia abajo (o el símbolo '+') en la parte derecha de la barra de direcciones de tu navegador y haz clic en él para instalarlo."
-                      : "Look for a monitor icon with a down arrow (or a '+' symbol) on the right side of your browser's address bar and click it to install."}
-                  </p>
-                </div>
-              </div>
+            <div className="mt-4">
+              <InstallAppButton
+                isDark={isDark}
+                language={language === "es" ? "es" : "en"}
+                variant="full"
+                onInstallCompleted={() => setIsInstallModalOpen(false)}
+              />
             </div>
 
             {/* Footer buttons */}
@@ -10786,7 +10667,7 @@ export default function Dashboard() {
                 onClick={() => setIsInstallModalOpen(false)}
                 className={`px-6 py-3 rounded-xl text-xs font-black uppercase tracking-wider ${isDark ? "bg-white/5 hover:bg-white/10 text-zinc-300" : "bg-black/5 hover:bg-black/10 text-zinc-650"} transition-all`}
               >
-                {language === "es" ? "Entendido" : "Close"}
+                {language === "es" ? "Cerrar" : "Close"}
               </button>
             </div>
           </div>
@@ -10831,6 +10712,39 @@ export default function Dashboard() {
               >
                 <X size={18} />
               </button>
+            </div>
+
+            {/* Family Code (Join Code) */}
+            <div className={`mb-6 p-4 rounded-2xl border ${isDark ? "bg-white/[0.03] border-white/5 text-zinc-300" : "bg-zinc-50 border-black/[0.04] text-zinc-700"}`}>
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                  <span className="text-[10px] font-black uppercase tracking-wider text-indigo-500 block">
+                    {language === "es" ? "Código de Familia" : "Family Code"}
+                  </span>
+                  <span className="text-xs font-mono font-bold select-all tracking-wider break-all block mt-0.5 opacity-95">
+                    {family?.id || "Generando..."}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (family?.id) {
+                      navigator.clipboard.writeText(family.id);
+                      alert(language === "es" ? "¡Código de familia copiado al portapapeles!" : "Family code copied to clipboard!");
+                    }
+                  }}
+                  className="px-3 py-2 text-[10px] font-black uppercase tracking-wider rounded-xl transition-all text-white shadow-md flex items-center gap-1.5 shrink-0 active:scale-95 duration-150"
+                  style={{ backgroundColor: currentTheme.accent }}
+                >
+                  <Clipboard size={12} />
+                  <span>{language === "es" ? "Copiar" : "Copy"}</span>
+                </button>
+              </div>
+              <p className="text-[10px] opacity-50 font-bold mt-2 leading-relaxed">
+                {language === "es"
+                  ? "Comparte este código con tu pareja o familiares. Al iniciar sesión con su cuenta de Google, podrán elegir 'Unirme a una' y pegar este código para sincronizar instantáneamente todas las notas y tareas."
+                  : "Share this code with your partner or family members. When they log in, they can choose 'Join an existing' and key in this code to synchronize all notes and tasks instantly."}
+              </p>
             </div>
 
             {/* Members List */}
@@ -12098,7 +12012,7 @@ const WeatherWidget = ({
         },
       });
     } catch (err: any) {
-      console.error(err);
+      console.warn("Weather fetch failed (handled gracefully):", err?.message || err);
       setError(tw.error);
     } finally {
       setLoading(false);
@@ -12106,26 +12020,48 @@ const WeatherWidget = ({
   };
 
   const loadAutomaticLocation = () => {
+    // 1. Instantly set up default fallback so the user registers a beautiful, working weather widget on the first frame
+    const defaultCity = language === "es" ? "Madrid, ES" : "London, GB";
+    const defaultLat = language === "es" ? 40.4165 : 51.5074;
+    const defaultLon = language === "es" ? -3.7026 : -0.1278;
+
+    setCityName(defaultCity);
+    fetchWeather(defaultLat, defaultLon);
+
+    // 2. Silently attempt to get their real location in the background
     if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          const lat = position.coords.latitude;
-          const lon = position.coords.longitude;
-          const defaultLabel =
-            language === "es" ? "Tu ubicación" : "Your location";
-          setCityName(defaultLabel);
-          localStorage.setItem("weatherCity", defaultLabel);
-          localStorage.setItem("weatherLat", String(lat));
-          localStorage.setItem("weatherLon", String(lon));
-          fetchWeather(lat, lon);
-        },
-        () => {
-          setupFallback();
-        },
-        { timeout: 5000 },
-      );
+      try {
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            const lat = position.coords.latitude;
+            const lon = position.coords.longitude;
+            const defaultLabel =
+              language === "es" ? "Tu ubicación" : "Your location";
+            setCityName(defaultLabel);
+            localStorage.setItem("weatherCity", defaultLabel);
+            localStorage.setItem("weatherLat", String(lat));
+            localStorage.setItem("weatherLon", String(lon));
+            fetchWeather(lat, lon);
+          },
+          (err) => {
+            console.log("Background silent geolocation skipped/denied (normal):", err);
+            // Save fallback so we don't prompt in every restart if they already denied/can't grant
+            localStorage.setItem("weatherCity", defaultCity);
+            localStorage.setItem("weatherLat", String(defaultLat));
+            localStorage.setItem("weatherLon", String(defaultLon));
+          },
+          { timeout: 4000 },
+        );
+      } catch (e) {
+        console.warn("Background geolocation block inside iframe sandbox:", e);
+        localStorage.setItem("weatherCity", defaultCity);
+        localStorage.setItem("weatherLat", String(defaultLat));
+        localStorage.setItem("weatherLon", String(defaultLon));
+      }
     } else {
-      setupFallback();
+      localStorage.setItem("weatherCity", defaultCity);
+      localStorage.setItem("weatherLat", String(defaultLat));
+      localStorage.setItem("weatherLon", String(defaultLon));
     }
   };
 

@@ -40,7 +40,7 @@ async function startServer() {
       
       const ai = getGenAI();
       const response = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
+        model: "gemini-3.5-flash",
         contents: `Analyze this family message: "${content}". Suggest a category and 3 short tags.`,
         config: {
           responseMimeType: "application/json",
@@ -75,7 +75,7 @@ async function startServer() {
 
       const ai = getGenAI();
       const response = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
+        model: "gemini-3.5-flash",
         contents: `Categorize this family task: "${title}". Suggest a major category and a more granular sub-category (like 'Groceries' under 'Shopping', 'Repair' or 'Cleaning' under 'Home', 'Homework' under 'School', 'Taxes' under 'Finance', 'Appointment' under 'Health', etc.).`,
         config: {
           responseMimeType: "application/json",
@@ -183,7 +183,7 @@ Current date: 2026-05-24`,
       const { recentTasks } = req.body;
       const ai = getGenAI();
       const response = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
+        model: "gemini-3.5-flash",
         contents: `Based on these past shopping lists: ${recentTasks.join(", ")}, suggest 5 items we might need soon.`,
         config: {
           responseMimeType: "application/json",

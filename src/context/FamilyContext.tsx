@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
-import { doc, onSnapshot, setDoc, serverTimestamp, collection } from 'firebase/firestore';
+import { doc, onSnapshot, setDoc, serverTimestamp, collection, getDoc, updateDoc, arrayUnion } from 'firebase/firestore';
 import { auth, db, handleFirestoreError, OperationType } from '../lib/firebase';
 
 interface UserData {
@@ -36,6 +36,7 @@ interface FamilyContextType {
   family: FamilyData | null;
   loading: boolean;
   joinOrCreateFamily: (name: string) => Promise<void>;
+  joinFamily: (familyId: string) => Promise<void>;
 }
 
 const FamilyContext = createContext<FamilyContextType | undefined>(undefined);
@@ -141,15 +142,52 @@ export const FamilyProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         photoURL: user.photoURL || '',
       };
       
-      await setDoc(doc(db, 'users', user.uid), ud);
+      await setDoc(doc(db, 'users', user.uid), ud, { merge: true });
     } catch (error) {
       console.error("joinOrCreateFamily error:", error);
       throw error;
     }
   };
 
+  const joinFamily = async (familyId: string) => {
+    if (!user) throw new Error("No hay usuario autenticado");
+    const cleanId = familyId.trim();
+    if (!cleanId) throw new Error("El código de la familia no puede estar vacío.");
+
+    try {
+      const familyRef = doc(db, 'families', cleanId);
+      const familySnap = await getDoc(familyRef);
+
+      if (!familySnap.exists()) {
+        throw new Error(
+          document.documentElement.lang === "en"
+            ? "The entered family code does not exist or is invalid."
+            : "El código de familia ingresado no existe o no es válido."
+        );
+      }
+
+      // Add the user to the family members array
+      await updateDoc(familyRef, {
+        members: arrayUnion(user.uid)
+      });
+
+      // Update the user's familyId reference
+      const ud: UserData = {
+        uid: user.uid,
+        familyId: cleanId,
+        displayName: user.displayName || 'Miembro Familiar',
+        photoURL: user.photoURL || '',
+      };
+
+      await setDoc(doc(db, 'users', user.uid), ud, { merge: true });
+    } catch (error) {
+      console.error("joinFamily error:", error);
+      throw error;
+    }
+  };
+
   return (
-    <FamilyContext.Provider value={{ user, userData, family, loading, joinOrCreateFamily }}>
+    <FamilyContext.Provider value={{ user, userData, family, loading, joinOrCreateFamily, joinFamily }}>
       {error && (
         <div className="fixed top-0 left-0 w-full bg-rose-600 text-white p-2 text-center text-xs font-bold z-50 flex items-center justify-center gap-4">
           <span>⚠️ {error}</span>

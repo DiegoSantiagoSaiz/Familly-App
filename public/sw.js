@@ -30,6 +30,29 @@ self.addEventListener('activate', (e) => {
 });
 
 self.addEventListener('fetch', (e) => {
+  // Only handle GET requests
+  if (e.request.method !== 'GET') {
+    return;
+  }
+
+  try {
+    const url = new URL(e.request.url);
+
+    // Skip API routes, Firebase domains, and external APIs we don't want to cache
+    if (
+      url.pathname.startsWith('/api/') ||
+      url.hostname.includes('googleapis.com') ||
+      url.hostname.includes('firebase') ||
+      url.hostname.includes('open-meteo.com') ||
+      url.hostname.includes('nager.at')
+    ) {
+      return;
+    }
+  } catch (err) {
+    // If URL parsing fails, ignore and let browser handle naturally
+    return;
+  }
+
   // Simple network-first fallback to cache strategy
   e.respondWith(
     fetch(e.request).catch(() => {

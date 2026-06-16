@@ -23,8 +23,8 @@ export const categorizeTask = async (title: string): Promise<SmartTaskSuggestion
       throw new Error(errorData.error || `API error: ${res.status}`);
     }
     return await res.json();
-  } catch (error) {
-    console.error("AI Task Categorization failed", error);
+  } catch (error: any) {
+    console.warn("AI Task Categorization failed (using fallback):", error?.message || error);
     return { category: "Other", priority: "Medium" };
   }
 };
@@ -41,8 +41,8 @@ export const categorizeMessage = async (content: string): Promise<SmartMessageSu
       throw new Error(errorData.error || `API error: ${res.status}`);
     }
     return await res.json();
-  } catch (error) {
-    console.error("AI Message Categorization failed", error);
+  } catch (error: any) {
+    console.warn("AI Message Categorization failed (using fallback):", error?.message || error);
     return { category: "Note", tags: [] };
   }
 };
@@ -59,8 +59,8 @@ export const getGroceriesSuggestions = async (recentTasks: string[]): Promise<st
       throw new Error(errorData.error || `API error: ${res.status}`);
     }
     return await res.json();
-  } catch (error) {
-    console.error("AI Grocery Suggestions failed", error);
+  } catch (error: any) {
+    console.warn("AI Grocery Suggestions failed (using fallback):", error?.message || error);
     return [];
   }
 };
@@ -101,8 +101,8 @@ export const prioritizeTasks = async (tasks: any[]): Promise<PrioritizedTaskResu
     }
     const data = await res.json();
     return data.prioritizedTasks || [];
-  } catch (error) {
-    console.error("AI Prioritize Tasks failed", error);
+  } catch (error: any) {
+    console.warn("AI Prioritize Tasks failed (using fallback):", error?.message || error);
     return [];
   }
 };
