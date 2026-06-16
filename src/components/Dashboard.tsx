@@ -6930,7 +6930,7 @@ export default function Dashboard() {
                                       dashboardFilteredTasks,
                                     )
                                   }
-                                  className={`${isDark ? "bg-white/5 border-white/5" : "bg-black/5 border-black/5"} p-6 rounded-[2.5rem] border ${
+                                  className={`${isDark ? "bg-white/5 border-white/5" : "bg-black/5 border-black/5"} py-4 px-6 rounded-2xl border ${
                                     isDragTarget
                                       ? "border-indigo-500 scale-[1.01] ring-2 ring-indigo-500/20"
                                       : isDragged

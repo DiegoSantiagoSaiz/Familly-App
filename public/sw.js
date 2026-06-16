@@ -1,26 +1,30 @@
-// Simple service worker for PWA support
-const CACHE_NAME = 'parrhq-v1';
-const ASSETS = [
-  '/',
-  '/index.html',
-  '/manifest.json',
-  '/icon.png'
+const CACHE_NAME = "familyhub-v1";
+const ASSETS_TO_CACHE = [
+  "/",
+  "/index.html",
+  "/manifest.json",
+  "/icons/icon-192.png",
+  "/icons/icon-512.png"
 ];
 
-self.addEventListener('install', (e) => {
-  e.waitUntil(
+// Install event - Cache core shell assets
+self.addEventListener("install", (event) => {
+  event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(ASSETS);
+      console.log("[Service Worker] Caching app shell assets");
+      return cache.addAll(ASSETS_TO_CACHE);
     }).then(() => self.skipWaiting())
   );
 });
 
-self.addEventListener('activate', (e) => {
-  e.waitUntil(
-    caches.keys().then((keys) => {
+// Activate event - Clean up old caches
+self.addEventListener("activate", (event) => {
+  event.waitUntil(
+    caches.keys().then((keyList) => {
       return Promise.all(
-        keys.map((key) => {
+        keyList.map((key) => {
           if (key !== CACHE_NAME) {
+            console.log("[Service Worker] Removing old cache", key);
             return caches.delete(key);
           }
         })
@@ -29,34 +33,49 @@ self.addEventListener('activate', (e) => {
   );
 });
 
-self.addEventListener('fetch', (e) => {
-  // Only handle GET requests
-  if (e.request.method !== 'GET') {
+// Fetch event - Cache-first with network fallback for assets, network-only for APIs
+self.addEventListener("fetch", (event) => {
+  const requestUrl = new URL(event.request.url);
+
+  // Do not intercept or cache API requests (like /api/ or Firebase endpoints)
+  if (requestUrl.pathname.startsWith("/api") || event.request.method !== "GET" || requestUrl.origin !== self.location.origin) {
     return;
   }
 
-  try {
-    const url = new URL(e.request.url);
+  event.respondWith(
+    caches.match(event.request).then((cachedResponse) => {
+      if (cachedResponse) {
+        // Return cached asset, but also fetch from network in background to update cache (stale-while-revalidate)
+        fetch(event.request).then((networkResponse) => {
+          if (networkResponse && networkResponse.status === 200) {
+            caches.open(CACHE_NAME).then((cache) => {
+              cache.put(event.request, networkResponse);
+            });
+          }
+        }).catch(() => {/* Ignore network errors if offline */});
+        
+        return cachedResponse;
+      }
 
-    // Skip API routes, Firebase domains, and external APIs we don't want to cache
-    if (
-      url.pathname.startsWith('/api/') ||
-      url.hostname.includes('googleapis.com') ||
-      url.hostname.includes('firebase') ||
-      url.hostname.includes('open-meteo.com') ||
-      url.hostname.includes('nager.at')
-    ) {
-      return;
-    }
-  } catch (err) {
-    // If URL parsing fails, ignore and let browser handle naturally
-    return;
-  }
+      // If not in cache, fetch from network
+      return fetch(event.request).then((response) => {
+        if (!response || response.status !== 200 || response.type !== "basic") {
+          return response;
+        }
 
-  // Simple network-first fallback to cache strategy
-  e.respondWith(
-    fetch(e.request).catch(() => {
-      return caches.match(e.request);
+        // Cache the newly fetched asset
+        const responseToCache = response.clone();
+        caches.open(CACHE_NAME).then((cache) => {
+          cache.put(event.request, responseToCache);
+        });
+
+        return response;
+      });
+    }).catch(() => {
+      // Fallback for document requests when offline and not cached
+      if (event.request.headers.get("accept").includes("text/html")) {
+        return caches.match("/index.html");
+      }
     })
   );
 });

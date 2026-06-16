@@ -40,7 +40,7 @@ async function startServer() {
       
       const ai = getGenAI();
       const response = await ai.models.generateContent({
-        model: "gemini-3.5-flash",
+        model: "gemini-2.5-flash",
         contents: `Analyze this family message: "${content}". Suggest a category and 3 short tags.`,
         config: {
           responseMimeType: "application/json",
@@ -75,7 +75,7 @@ async function startServer() {
 
       const ai = getGenAI();
       const response = await ai.models.generateContent({
-        model: "gemini-3.5-flash",
+        model: "gemini-2.5-flash",
         contents: `Categorize this family task: "${title}". Suggest a major category and a more granular sub-category (like 'Groceries' under 'Shopping', 'Repair' or 'Cleaning' under 'Home', 'Homework' under 'School', 'Taxes' under 'Finance', 'Appointment' under 'Health', etc.).`,
         config: {
           responseMimeType: "application/json",
@@ -136,7 +136,7 @@ Rules:
    - "reason": A brief 1-sentence friendly explanation of why this priority was assigned. If the input titles look Spanish, write the reason in Spanish; otherwise in English.`;
 
       const response = await ai.models.generateContent({
-        model: "gemini-3.5-flash",
+        model: "gemini-2.5-flash",
         contents: `Optimice prioritizing for these active family tasks:
 ${JSON.stringify(tasks, null, 2)}
 
@@ -183,7 +183,7 @@ Current date: 2026-05-24`,
       const { recentTasks } = req.body;
       const ai = getGenAI();
       const response = await ai.models.generateContent({
-        model: "gemini-3.5-flash",
+        model: "gemini-2.5-flash",
         contents: `Based on these past shopping lists: ${recentTasks.join(", ")}, suggest 5 items we might need soon.`,
         config: {
           responseMimeType: "application/json",
@@ -220,7 +220,7 @@ Your output MUST be a valid, standalone XML SVG markup representing the requeste
 - Ensure the contrast is very high and looks beautiful.`;
 
       const response = await ai.models.generateContent({
-        model: "gemini-3.5-flash",
+        model: "gemini-2.5-flash",
         contents: `Create a beautiful, modern flat vector avatar SVG of: "${prompt}". Ensure it's tailored as a personal profile badge, colorful, artistic, and friendly.`,
         config: {
           systemInstruction,

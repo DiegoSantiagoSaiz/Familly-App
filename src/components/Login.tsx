@@ -32,7 +32,8 @@ export default function Login() {
       setStep(2);
     } catch (err: any) {
       console.error(err);
-      setError("Failed to sign in. Please try again.");
+      const details = err.code ? `${err.code} - ${err.message}` : (err.message || String(err));
+      setError(`Failed to sign in. Details: ${details}`);
     } finally {
       setIsLoggingIn(false);
     }
