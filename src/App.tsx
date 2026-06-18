@@ -38,12 +38,12 @@ function AppContent() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 relative">
-      {/* Botón flotante para copiar el ID de la familia */}
-      <div className="absolute top-4 right-4 z-50 flex items-center gap-2">
+    <div className="min-h-screen bg-gray-50 flex flex-col">
+      {/* Barra superior limpia que no tapa los botones del Dashboard */}
+      <div className="w-full bg-white border-b border-gray-200 p-4 flex justify-center items-center">
         <button
           onClick={copiarCodigoFamiliar}
-          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold shadow-md transition-all duration-200 ${
+          className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-semibold shadow-sm transition-all duration-200 ${
             copiado 
               ? 'bg-green-600 text-white' 
               : 'bg-blue-600 hover:bg-blue-700 text-white'
@@ -53,7 +53,10 @@ function AppContent() {
         </button>
       </div>
 
-      <Dashboard />
+      {/* El Dashboard ahora se renderiza debajo de la barra de forma natural */}
+      <div className="flex-1">
+        <Dashboard />
+      </div>
     </div>
   );
 }
