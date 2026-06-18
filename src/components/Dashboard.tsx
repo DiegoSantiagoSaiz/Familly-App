@@ -5783,7 +5783,28 @@ export default function Dashboard() {
             )}
           </button>
         </div>
-
+{family?.id && (
+                <div className={`mx-6 mb-4 p-3 rounded-2xl border flex items-center justify-between gap-2 ${isDark ? "bg-indigo-500/10 border-indigo-500/20" : "bg-indigo-50 border-indigo-100"}`}>
+                  <div className="min-w-0 flex-1">
+                    <p className={`text-[9px] font-black uppercase tracking-wider mb-0.5 ${isDark ? "text-indigo-400" : "text-indigo-500"}`}>
+                      {language === "es" ? "Código Familiar" : "Family Code"}
+                    </p>
+                    <p className={`text-[10px] font-mono font-bold truncate ${isDark ? "text-zinc-300" : "text-zinc-700"}`}>
+                      {family.id}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(family.id);
+                      alert(language === "es" ? "¡Código copiado!" : "Code copied!");
+                    }}
+                    className="shrink-0 px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider bg-indigo-500 text-white hover:bg-indigo-400 active:scale-95 transition-all flex items-center gap-1.5"
+                  >
+                    <Clipboard size={12} />
+                    <span>{language === "es" ? "Copiar" : "Copy"}</span>
+                  </button>
+                </div>
+              )}
         <nav className="flex-1 px-4 space-y-1 overflow-y-auto custom-scrollbar">
           {hubs.map((hub) => {
             const HubIcon = hub.icon;
