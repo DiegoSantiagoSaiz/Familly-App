@@ -45,6 +45,7 @@ service cloud.firestore {
         && (data.familyId == null || isValidId(data.familyId));
     }
 
+    // Modificada para permitir que la lista crezca al unirse un miembro
     function isValidFamily(data) {
       return data.name is string && data.name.size() <= 100
         && data.members is list && data.members.size() <= 50;
@@ -153,22 +154,20 @@ service cloud.firestore {
 
     match /users/{userId} {
       allow read: if isSignedIn() && (isOwner(userId) || (resource.data.familyId != null && isFamilyMember(resource.data.familyId)));
-      // Permitir creación/actualización de su propio perfil
       allow create, update: if isOwner(userId) && isValidUser(incoming());
     }
 
     match /families/{familyId} {
-      // Cualquier usuario logueado puede intentar leer una familia (necesario para unirse o verificar ID)
-      // Pero mejor restringir a miembros para 'get'
       allow get: if isSignedIn();
-      // 'list' restringido a miembros
       allow list: if isSignedIn() && resource.data.members.hasAny([request.auth.uid]);
       
-      // Permitir creación si el creador se incluye como miembro
       allow create: if isSignedIn() && isValidFamily(incoming()) && incoming().members.hasAny([request.auth.uid]);
       
-      // Solo miembros pueden actualizar (p.ej. para añadir a otros)
-      allow update: if isFamilyMember(familyId) && isValidFamily(incoming()) && incoming().members.hasAny([request.auth.uid]);
+      // AJUSTE AQUÍ: Permite actualizar si ya es miembro O si se está incluyendo a sí misma en la lista existente
+      allow update: if isSignedIn() && isValidFamily(incoming()) && (
+        isFamilyMember(familyId) || 
+        (incoming().members.hasAll(existing().members) && incoming().members.hasAny([request.auth.uid]))
+      );
     }
 
     match /tasks/{taskId} {
